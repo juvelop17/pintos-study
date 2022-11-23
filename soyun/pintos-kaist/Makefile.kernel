@@ -2,9 +2,17 @@
 
 all:
 
-include Make.vars
+include Make.vars	# KERNEL_SUBDIRS = threads devices lib lib/kernel $(TEST_SUBDIRS)
+			# TEST_SUBDIRS = tests/threads tests/threads/mlfqs
+			# GRADING_FILE = $(SRCDIR)/tests/threads/Grading
+
 
 DIRS = $(sort $(addprefix build/,$(KERNEL_SUBDIRS) $(TEST_SUBDIRS) lib/user))
+			# addprefix 접두어 첨가
+			# sort는 문자열 정렬
+			# DIRS = build/thread, build/devices, build/lib, build/lib/kernel, 
+			#	build/tests/threads, build/tests/threads/mlfqs, build/lib/user
+
 
 all grade check: $(DIRS) build/Makefile
 	cd build && $(MAKE) $@
