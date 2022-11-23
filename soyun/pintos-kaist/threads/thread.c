@@ -28,6 +28,9 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
+/* List of sleep*/
+static struct list sleep_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -109,6 +112,7 @@ thread_init (void) {
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 	list_init (&destruction_req);
+	list_init (&sleep_list);
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
@@ -132,6 +136,45 @@ thread_start (void) {
 	/* Wait for the idle thread to initialize idle_thread. */
 	sema_down (&idle_started);
 }
+
+
+/* Add this thread to sleep_list  */
+void
+thread_sleep(int64_t awake_ticks) {
+
+	struct thread *curr = thread_current ();
+	enum intr_level old_level;
+
+	ASSERT (!intr_context ());
+
+	old_level = intr_disable ();
+	if (curr != idle_thread) {
+		curr->awake_ticks = awake_ticks;
+		list_push_back(&sleep_list, &curr->elem);
+	} 
+
+	thread_block();
+	intr_set_level (old_level);
+}
+
+/* Awake thread at ticks */
+void thread_awake(int64_t awake_ticks) {
+
+	struct list_elem *e;
+	e = list_begin(&sleep_list);
+
+	while(e != list_end(&sleep_list)){
+		struct thread *t = list_entry(e, struct thread, elem);
+
+		if(awake_ticks >= t->awake_ticks){
+			e = list_remove(&t->elem);
+			thread_unblock(t);
+		}else{
+			e = list_next(e);
+		}
+	}
+}
+
 
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
