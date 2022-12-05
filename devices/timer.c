@@ -93,14 +93,15 @@ timer_sleep (int64_t ticks) {
 	int64_t start = timer_ticks ();
 
 	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+
+	// while (timer_elapsed (start) < ticks)
+	// 	thread_yield ();
 
 	// TODO : change the state of the caller thread to blocked and put it to the sleep queue.
 	// TODO : apply interrupt on the thread and insert it to the ready queue
 
-	// if (timer_elapsed (start) < thicks)
-	// 	thread_sleep(start + thicks);
+	if (timer_elapsed (start) < ticks)
+		thread_sleep(start + ticks);
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -128,9 +129,19 @@ timer_print_stats (void) {
 }
 
 /* Timer interrupt handler. */
+/* 	At every tick, 
+	check whether some thread must wake up from sleep queue and call wake up function. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
+
+	for (int i = 0; i < list_size(&sleep_list); i++) {
+		struct thread *victim = list_entry(list_pop_front (&sleep_list), struct thread, elem);
+		if (victim->target_ticks >= ticks) {
+			thread_unblock(victim);
+		}
+	}
+
 	thread_tick ();
 }
 
