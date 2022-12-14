@@ -28,9 +28,6 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
-static struct list sleep_list;
-static int64_t min_ticks;
-
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -112,9 +109,6 @@ thread_init (void) {
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 	list_init (&destruction_req);
-
-	list_init (&sleep_list);
-	setMinTicks(INT64_MAX);
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
@@ -593,28 +587,4 @@ allocate_tid (void) {
 	lock_release (&tid_lock);
 
 	return tid;
-}
-
-void thread_sleep(int64_t cur_ticks) {
-	enum intr_level old_level;
-	
-	old_level = intr_disable ();
-	struct thread *t = thread_current();
-	// ASSERT (t->status == idle_thread);
-	t->target_ticks = cur_ticks;
-
-	if (getMinTicks() > cur_ticks) {
-		setMinTicks(cur_ticks);
-	}
-	list_push_back (&sleep_list, &t->elem);
-	thread_block();
-	intr_set_level (old_level);
-}
-
-void setMinTicks(int64_t _min_ticks) {
-	min_ticks = _min_ticks;
-}
-
-int64_t getMinTicks() {
-	return min_ticks;
 }
