@@ -28,8 +28,8 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
-/* sleep queue */
 static struct list sleep_list;
+static int64_t min_ticks;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -111,8 +111,10 @@ thread_init (void) {
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
-	list_init (&sleep_list);
 	list_init (&destruction_req);
+
+	list_init (&sleep_list);
+	setMinTicks(INT64_MAX);
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
@@ -248,7 +250,6 @@ thread_unblock (struct thread *t) {
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
-
 
 /* Returns the name of the running thread. */
 const char *
@@ -594,23 +595,26 @@ allocate_tid (void) {
 	return tid;
 }
 
+void thread_sleep(int64_t cur_ticks) {
+	enum intr_level old_level;
+	
+	old_level = intr_disable ();
+	struct thread *t = thread_current();
+	// ASSERT (t->status == idle_thread);
+	t->target_ticks = cur_ticks;
 
+	if (getMinTicks() > cur_ticks) {
+		setMinTicks(cur_ticks);
+	}
+	list_push_back (&sleep_list, &t->elem);
+	thread_block();
+	intr_set_level (old_level);
+}
 
-/* block current thread until targeted ticks */
-/* if the current thread is not idle thread,
-	change the state of the caller thread to BLOCKED,
-	store the local tick to wake up,
-	update the global tick if necessary,
-	and call schedule() */
-/* When you manipulate thread list, disable interrupt! */
-/* Call the function that insert thread to the sleep queue. */
-void thread_sleep(int64_t target_ticks) {
-	struct thread *cur = thread_current();
-	cur->target_ticks = target_ticks;
+void setMinTicks(int64_t _min_ticks) {
+	min_ticks = _min_ticks;
+}
 
-	list_push_back(&sleep_list, &cur->elem);
-	idle(cur);
-
-	// schedule();
-	// thread_yield();
+int64_t getMinTicks() {
+	return min_ticks;
 }
