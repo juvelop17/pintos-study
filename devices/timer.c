@@ -20,6 +20,7 @@
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 
+
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
@@ -94,7 +95,7 @@ timer_sleep (int64_t ticks) {
 
 	ASSERT (intr_get_level () == INTR_ON);
 	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+		thread_sleep (start+ticks);
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -126,6 +127,28 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
+
+	struct list_elem *cur_elem;
+	struct thread *cur_thread;
+
+	if (getMinTicks() > ticks) {
+		return;
+	}
+
+	setMinTicks(INT64_MAX);
+	cur_elem = list_begin(&sleep_list);
+	while (cur_elem != list_end(&sleep_list)) {
+		cur_thread = list_entry(cur_elem, struct thread, elem);
+		if (cur_thread->target_ticks <= ticks) {
+			thread_unblock(cur_thread);
+			cur_elem = list_remove(cur_elem);
+		} else {
+			if (getMinTicks() > cur_thread->target_ticks) {
+				setMinTicks(cur_thread->target_ticks);
+			}
+			cur_elem = list_next(cur_elem);
+		}
+	}
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
@@ -184,3 +207,4 @@ real_time_sleep (int64_t num, int32_t denom) {
 		busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000));
 	}
 }
+
