@@ -147,6 +147,8 @@ void do_iret (struct intr_frame *tf);
 /*--------------------------------------------*/
 void thread_sleep(int64_t cur_ticks);
 void thread_awake (int64_t ticks);
+bool cmp_priority(struct list_elem *a, struct list_elem *b, void *aux);
+void thread_current_priority_check();
 
 void setMinTicks(int64_t _min_ticks);
 int64_t getMinTicks();

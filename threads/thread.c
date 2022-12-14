@@ -212,6 +212,10 @@ tid_t thread_create(const char *name, int priority,
 	/* Add to run queue. */
 	thread_unblock(t);
 
+	/* compare the priorities of the currently running thread and the newly inserted one.
+	Yield the CPU if the newly arriving thread has higher priority*/
+	thread_current_priority_check();
+
 	return tid;
 }
 
@@ -227,6 +231,19 @@ void thread_block(void)
 	ASSERT(intr_get_level() == INTR_OFF);
 	thread_current()->status = THREAD_BLOCKED;
 	schedule();
+}
+
+bool cmp_priority(struct list_elem *a, struct list_elem *b, void *aux)
+{
+	return list_entry(a, struct thread, elem)->priority > list_entry(b, struct thread, elem)->priority;
+}
+
+void thread_current_priority_check()
+{
+	if (!list_empty(&ready_list) && thread_current()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority)
+	{
+		thread_yield();
+	}
 }
 
 /* Transitions a blocked thread T to the ready-to-run state.
@@ -245,7 +262,10 @@ void thread_unblock(struct thread *t)
 
 	old_level = intr_disable();
 	ASSERT(t->status == THREAD_BLOCKED);
-	list_push_back(&ready_list, &t->elem);
+
+	// list_push_back(&ready_list, &t->elem);
+	list_insert_ordered(&ready_list, &t->elem, cmp_priority, NULL);
+
 	t->status = THREAD_READY;
 	intr_set_level(old_level);
 }
@@ -310,7 +330,9 @@ void thread_yield(void)
 
 	old_level = intr_disable();
 	if (curr != idle_thread)
-		list_push_back(&ready_list, &curr->elem);
+		// list_push_back(&ready_list, &curr->elem);
+		list_insert_ordered(&ready_list, &curr->elem, cmp_priority, NULL);
+
 	do_schedule(THREAD_READY);
 	intr_set_level(old_level);
 }
@@ -319,6 +341,7 @@ void thread_yield(void)
 void thread_set_priority(int new_priority)
 {
 	thread_current()->priority = new_priority;
+	thread_current_priority_check();
 }
 
 /* Returns the current thread's priority. */
@@ -622,11 +645,11 @@ void thread_sleep(int64_t cur_ticks)
 	ASSERT(t != idle_thread);
 	t->target_ticks = cur_ticks;
 
-	if (getMinTicks() > cur_ticks) {
+	if (getMinTicks() > cur_ticks)
+	{
 		setMinTicks(cur_ticks);
 	}
 	list_push_back(&sleep_list, &t->elem);
-	printf("thread blocked\n");
 	thread_block();
 	intr_set_level(old_level);
 }
@@ -640,13 +663,14 @@ void thread_awake(int64_t ticks)
 	{
 		struct thread *t = list_entry(e, struct thread, elem);
 		if (t->target_ticks <= ticks)
-		{						
-			e = list_remove(e); 
-			thread_unblock(t);	
-			printf("thread unblocked\n");
+		{
+			e = list_remove(e);
+			thread_unblock(t);
 		}
-		else {
-			if (getMinTicks() > t->target_ticks) {
+		else
+		{
+			if (getMinTicks() > t->target_ticks)
+			{
 				setMinTicks(t->target_ticks);
 			}
 			e = list_next(e);
@@ -654,10 +678,12 @@ void thread_awake(int64_t ticks)
 	}
 }
 
-void setMinTicks(int64_t _min_ticks) {
+void setMinTicks(int64_t _min_ticks)
+{
 	min_ticks = _min_ticks;
 }
 
-int64_t getMinTicks() {
+int64_t getMinTicks()
+{
 	return min_ticks;
 }
