@@ -94,7 +94,7 @@ timer_sleep (int64_t ticks) {
 	int64_t start = timer_ticks ();
 
 	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
+	// while (timer_elapsed (start) < ticks)
 		thread_sleep (start+ticks);
 }
 
@@ -128,27 +128,13 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
 
-	struct list_elem *cur_elem;
-	struct thread *cur_thread;
+	thread_awake (ticks);
 
-	if (getMinTicks() > ticks) {
-		return;
-	}
 
-	setMinTicks(INT64_MAX);
-	cur_elem = list_begin(&sleep_list);
-	while (cur_elem != list_end(&sleep_list)) {
-		cur_thread = list_entry(cur_elem, struct thread, elem);
-		if (cur_thread->target_ticks <= ticks) {
-			thread_unblock(cur_thread);
-			cur_elem = list_remove(cur_elem);
-		} else {
-			if (getMinTicks() > cur_thread->target_ticks) {
-				setMinTicks(cur_thread->target_ticks);
-			}
-			cur_elem = list_next(cur_elem);
-		}
-	}
+	// if (getMinTicks() > ticks) {
+	// 	return;
+	// }
+	// setMinTicks(INT64_MAX);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
