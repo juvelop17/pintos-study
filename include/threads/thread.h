@@ -93,6 +93,12 @@ struct thread {
 	int priority;                       /* Priority. */
 	int64_t target_ticks;
 
+	/* to resolve priority inversion */
+	int base_priority;
+	struct list donations;
+	struct list_elem d_elem;              /* List element. */
+	struct lock *wait_on_lock;
+
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 
@@ -148,10 +154,13 @@ void do_iret (struct intr_frame *tf);
 void thread_sleep(int64_t cur_ticks);
 void thread_awake (int64_t ticks);
 bool cmp_priority(struct list_elem *a, struct list_elem *b, void *aux);
+bool cmp_donate_priority(struct list_elem *a, struct list_elem *b, void *aux);
 void thread_current_priority_check();
 
 void setMinTicks(int64_t _min_ticks);
 int64_t getMinTicks();
+
+void refresh_priority();
 /*--------------------------------------------*/
 
 #endif /* threads/thread.h */

@@ -194,8 +194,23 @@ void lock_acquire(struct lock *lock)
 	ASSERT(!intr_context());
 	ASSERT(!lock_held_by_current_thread(lock));
 
+	struct thread *holder_thread = lock->holder;
+	struct thread *current_thread = thread_current();
+	if (holder_thread != NULL) {
+		current_thread->wait_on_lock = lock;
+		list_push_back(&holder_thread->donations, &current_thread->d_elem);
+
+		struct thread *cur = current_thread;
+		while (cur->wait_on_lock != NULL) {
+			struct thread *next = cur->wait_on_lock->holder;
+			next->priority = cur->priority;
+			cur = next;
+		}
+	}
+
 	sema_down(&lock->semaphore);
-	lock->holder = thread_current();
+	current_thread->wait_on_lock = NULL;
+	lock->holder = current_thread;
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -228,6 +243,17 @@ void lock_release(struct lock *lock)
 	ASSERT(lock != NULL);
 	ASSERT(lock_held_by_current_thread(lock));
 
+	struct thread *current_thread = thread_current();
+	struct list_elem *e;
+	for (e = list_begin(&current_thread->donations); e != list_end(&current_thread->donations); e = list_next(e)) {
+		struct thread *t = list_entry(e, struct thread, d_elem);
+		if (t->wait_on_lock == lock) {
+			list_remove(&t->d_elem);
+		}
+	}
+	
+	refresh_priority();
+	
 	lock->holder = NULL;
 	sema_up(&lock->semaphore);
 }

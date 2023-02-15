@@ -196,6 +196,8 @@ tid_t thread_create(const char *name, int priority,
 	init_thread(t, name, priority);
 	tid = t->tid = allocate_tid();
 
+	t->base_priority = 0;
+
 	/* Call the kernel_thread if it scheduled.
 	 * Note) rdi is 1st argument, and rsi is 2nd argument. */
 	t->tf.rip = (uintptr_t)kernel_thread;
@@ -235,6 +237,12 @@ bool cmp_priority(struct list_elem *a, struct list_elem *b, void *aux)
 {
 	return list_entry(a, struct thread, elem)->priority > list_entry(b, struct thread, elem)->priority;
 }
+
+bool cmp_donate_priority(struct list_elem *a, struct list_elem *b, void *aux)
+{
+	return list_entry(a, struct thread, d_elem)->priority > list_entry(b, struct thread, d_elem)->priority;
+}
+
 
 void thread_current_priority_check()
 {
@@ -338,7 +346,8 @@ void thread_yield(void)
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority)
 {
-	thread_current()->priority = new_priority;
+	thread_current()->base_priority = new_priority;
+	refresh_priority();
 	thread_current_priority_check();
 }
 
@@ -443,6 +452,10 @@ init_thread(struct thread *t, const char *name, int priority)
 	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+
+	list_init(&t->donations);
+	t->wait_on_lock = NULL;
+	t->base_priority = priority;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -684,4 +697,17 @@ void setMinTicks(int64_t _min_ticks)
 int64_t getMinTicks()
 {
 	return min_ticks;
+}
+
+void refresh_priority() {
+	struct thread *cur = thread_current();
+	cur->priority = cur->base_priority;
+	
+	if (!list_empty(&cur->donations)) {
+		list_sort(&cur->donations, cmp_donate_priority, NULL);
+		struct thread *front = list_entry(list_front(&cur->donations), struct thread, d_elem);
+		if (front->priority > cur->priority) {
+			cur->priority = front->priority;
+		}
+	}
 }
